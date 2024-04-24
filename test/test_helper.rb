@@ -21,8 +21,8 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 #--------------------------------------------------------------------------
-require "coveralls"
-Coveralls.wear!
+# require "coveralls"
+# Coveralls.wear!
 
 require "dotenv"
 Dotenv.load
@@ -37,7 +37,7 @@ require "timecop"
 require "logger"
 require "stringio"
 
-# add to the MiniTest DSL
+# add to the Minitest DSL
 module Kernel
   def need_tests_for(name)
     describe "##{name}" do
