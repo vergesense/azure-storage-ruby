@@ -36,8 +36,8 @@ Gem::Specification.new do |s|
   s.summary     = "Official Ruby client library to consume Azure Storage Common service"
   s.homepage    = "http://github.com/azure/azure-storage-ruby"
   s.license     = "MIT"
-  s.files       = `git ls-files ./lib/azure/storage/common/`.split("\n") << "./lib/azure/storage/common.rb"
-  s.files       += `git ls-files ./lib/azure/core/`.split("\n") << "./lib/azure/core.rb" << "./lib/azure/http_response_helper.rb"
+  s.files       = Dir.glob("lib/azure/storage/common/**/*.rb") << "./lib/azure/storage/common.rb"
+  s.files       += Dir.glob("lib/azure/core/**/*.rb") << "./lib/azure/core.rb" << "./lib/azure/http_response_helper.rb"
 
   s.required_ruby_version = ">= 2.3.0"
 
