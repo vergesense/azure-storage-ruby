@@ -41,6 +41,7 @@ Gem::Specification.new do |s|
 
   s.required_ruby_version = ">= 2.3.0"
 
+  s.add_runtime_dependency("cgi",                          "~> 0.5")
   s.add_runtime_dependency('faraday',                     '~> 2')
   s.add_runtime_dependency('faraday-net_http_persistent', "~> 2")
   s.add_runtime_dependency('faraday-follow_redirects',    "~> 0.3")

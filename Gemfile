@@ -37,6 +37,7 @@ source "https://rubygems.org" do
   gem "timecop",                      "~> 0.7", :require => false
   gem "yard",                         "~> 0.9", ">= 0.9.11", :require => false
   gem "coveralls",                    require: false
+  gem "cgi",                           "~> 0.5", :require => false
   gem "ostruct",                      "~> 0.6", :require => false
   gem "base64",                       "~> 0.3", :require => false
 end
