@@ -130,56 +130,46 @@ module Azure::Storage
       end
 
       def self.blob_enumeration_results_from_xml(xml)
-        xml = slopify(xml)
-        expect_node("EnumerationResults", xml)
+        doc = xml.is_a?(String) ? Nokogiri::XML(xml) : xml
+        root = doc.is_a?(Nokogiri::XML::Document) ? doc.root : doc
+        raise "Xml is not a EnumerationResults node. xml:\n#{root}" unless root.name == "EnumerationResults"
 
-        results = enumeration_results_from_xml(xml, Azure::Storage::Common::Service::EnumerationResults.new)
+        results = Azure::Storage::Common::Service::EnumerationResults.new
+        marker = root.at_xpath("NextMarker")
+        results.continuation_token = marker.text if marker && !marker.text.empty?
 
-        return results unless (xml > "Blobs").any?
-
-        if ((xml > "Blobs") > "Blob").any?
-          if xml.Blobs.Blob.count == 0
-            results.push(blob_from_xml(xml.Blobs.Blob))
-          else
-            xml.Blobs.Blob.each { |blob_node|
-              results.push(blob_from_xml(blob_node))
-            }
-          end
+        root.xpath("Blobs/Blob").each do |blob_node|
+          results.push(blob_from_xml(blob_node))
         end
 
-        if ((xml > "Blobs") > "BlobPrefix").any?
-          if xml.Blobs.BlobPrefix.count == 0
-            results.push(blob_prefix_from_xml(xml.Blobs.BlobPrefix))
-          else
-            xml.Blobs.BlobPrefix.each { |blob_prefix|
-              results.push(blob_prefix_from_xml(blob_prefix))
-            }
-          end
+        root.xpath("Blobs/BlobPrefix").each do |prefix_node|
+          results.push(blob_prefix_from_xml(prefix_node))
         end
 
         results
       end
 
       def self.blob_prefix_from_xml(xml)
-        xml = slopify(xml)
-        expect_node("BlobPrefix", xml)
-
-        name = xml.Name.text if (xml > "Name").any?
-        name
+        name_node = xml.at_xpath("Name")
+        name_node&.text
       end
 
       def self.blob_from_xml(xml)
-        xml = slopify(xml)
-        expect_node("Blob", xml)
-
         Blob.new do |blob|
-          blob.name = xml.Name.text if (xml > "Name").any?
-          blob.snapshot = xml.Snapshot.text if (xml > "Snapshot").any?
+          node = xml.at_xpath("Name")
+          blob.name = node.text if node
 
-          blob.metadata = metadata_from_xml(xml.Metadata) if (xml > "Metadata").any?
-          if (xml > "Properties").any?
-            blob.properties = blob_properties_from_xml(xml.Properties)
-            blob.encrypted = xml.Properties.ServerEncrypted.text == "true" if (xml.Properties > "ServerEncrypted").any?
+          node = xml.at_xpath("Snapshot")
+          blob.snapshot = node.text if node
+
+          node = xml.at_xpath("Metadata")
+          blob.metadata = metadata_from_xml(node) if node
+
+          props_node = xml.at_xpath("Properties")
+          if props_node
+            blob.properties = blob_properties_from_xml(props_node)
+            node = props_node.at_xpath("ServerEncrypted")
+            blob.encrypted = node.text == "true" if node
           end
         end
       end
@@ -193,36 +183,45 @@ module Azure::Storage
         end
       end
 
-      def self.blob_properties_from_xml(xml)
-        xml = slopify(xml)
-        expect_node("Properties", xml)
+      BLOB_PROPERTY_MAPPINGS = {
+        "AccessTier" => :access_tier,
+        "AccessTierChangeTime" => :access_tier_change_time,
+        "Creation-Time" => :creation_Time,
+        "Last-Modified" => :last_modified,
+        "Etag" => :etag,
+        "LeaseStatus" => :lease_status,
+        "LeaseState" => :lease_state,
+        "LeaseDuration" => :lease_duration,
+        "Content-Type" => :content_type,
+        "Content-Encoding" => :content_encoding,
+        "Content-Language" => :content_language,
+        "Content-MD5" => :content_md5,
+        "Cache-Control" => :cache_control,
+        "BlobType" => :blob_type,
+        "CopyId" => :copy_id,
+        "CopyStatus" => :copy_status,
+        "CopySource" => :copy_source,
+        "CopyProgress" => :copy_progress,
+        "CopyCompletionTime" => :copy_completion_time,
+        "CopyStatusDescription" => :copy_status_description
+      }.freeze
 
+      def self.blob_properties_from_xml(xml)
         props = {}
 
-        props[:access_tier] = (xml > "AccessTier").text if (xml > "AccessTier").any?
-        props[:access_tier_change_time] = (xml > "AccessTierChangeTime").text if (xml > "AccessTierChangeTime").any?
-        props[:creation_Time] = (xml > "Creation-Time").text if (xml > "Creation-Time").any?
-        props[:last_modified] = (xml > "Last-Modified").text if (xml > "Last-Modified").any?
-        props[:etag] = xml.Etag.text if (xml > "Etag").any?
-        props[:lease_status] = xml.LeaseStatus.text if (xml > "LeaseStatus").any?
-        props[:lease_state] = xml.LeaseState.text if (xml > "LeaseState").any?
-        props[:lease_duration] = xml.LeaseDuration.text if (xml > "LeaseDuration").any?
-        props[:content_length] = (xml > "Content-Length").text.to_i if (xml > "Content-Length").any?
-        props[:content_type] = (xml > "Content-Type").text if (xml > "Content-Type").any?
-        props[:content_encoding] = (xml > "Content-Encoding").text if (xml > "Content-Encoding").any?
-        props[:content_language] = (xml > "Content-Language").text if (xml > "Content-Language").any?
-        props[:content_md5] = (xml > "Content-MD5").text if (xml > "Content-MD5").any?
+        BLOB_PROPERTY_MAPPINGS.each do |xml_name, prop_key|
+          node = xml.at_xpath(xml_name)
+          props[prop_key] = node.text if node
+        end
 
-        props[:cache_control] = (xml > "Cache-Control").text if (xml > "Cache-Control").any?
-        props[:sequence_number] = (xml > "x-ms-blob-sequence-number").text.to_i if (xml > "x-ms-blob-sequence-number").any?
-        props[:blob_type] = xml.BlobType.text if (xml > "BlobType").any?
-        props[:copy_id] = xml.CopyId.text if (xml > "CopyId").any?
-        props[:copy_status] = xml.CopyStatus.text if (xml > "CopyStatus").any?
-        props[:copy_source] = xml.CopySource.text if (xml > "CopySource").any?
-        props[:copy_progress] = xml.CopyProgress.text if (xml > "CopyProgress").any?
-        props[:copy_completion_time] = xml.CopyCompletionTime.text if (xml > "CopyCompletionTime").any?
-        props[:copy_status_description] = xml.CopyStatusDescription.text if (xml > "CopyStatusDescription").any?
-        props[:incremental_copy] = xml.IncrementalCopy.text == "true" if (xml > "IncrementalCopy").any?
+        node = xml.at_xpath("Content-Length")
+        props[:content_length] = node.text.to_i if node
+
+        node = xml.at_xpath("x-ms-blob-sequence-number")
+        props[:sequence_number] = node.text.to_i if node
+
+        node = xml.at_xpath("IncrementalCopy")
+        props[:incremental_copy] = node.text == "true" if node
 
         props
       end
